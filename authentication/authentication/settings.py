@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "rest_framework",
     "myapp",
+    "djangosaml2"
 ]
 
 MIDDLEWARE = [
@@ -129,4 +130,13 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ],
+}
+
+SAML_AUTH = {
+    'SP_ENTITY_ID': 'http://localhost:8000/sso/acs/',  # Service Provider URL
+    'ACS_URL': 'http://localhost:8000/sso/acs/',  # Assertion Consumer Service (ACS) URL
+    'IDP_ENTITY_ID': 'https://idp.example.com/saml',  # Identity Provider (IdP) URL
+    'IDP_SSO_URL': 'https://idp.example.com/sso',  # IdP SSO URL
+    'IDP_PUBLIC_CERT': '/path/to/idp-public-cert.pem',  # Path to the IdP public certificate
+    'SAML_METADATA_URL': 'https://idp.example.com/metadata',  # IdP metadata URL
 }
