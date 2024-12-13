@@ -1,4 +1,5 @@
 from django.contrib.auth.models import User
+from django.http import HttpResponse
 from rest_framework import serializers
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -101,7 +102,19 @@ class ProtectedView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        return Response({"message": "This is a protected view, you are authenticated!"})
+        # Define your HTML content
+        html_content = """
+        <html>
+            <head><title>Protected Page</title></head>
+            <body>
+                <h1>Welcome, you are authenticated!</h1>
+                <p>This is a protected view.</p>
+            </body>
+        </html>
+        """
+
+        # Return the HTML content as an HTTP response
+        return HttpResponse(html_content, content_type="text/html")
 
 class ProtectedViewd(APIView):
     permission_classes = [IsAuthenticated, IsAdmin]  
