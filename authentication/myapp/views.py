@@ -30,7 +30,7 @@ class RegisterSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         # Check if the role is valid before creating the user
         role = validated_data.get('role', 'user')  # Default role is 'user'
-        if role not in ['admin', 'user']:
+        if role not in ['admin', 'user','customer']:
             raise serializers.ValidationError({"role": "Invalid role. Choose either 'admin' or 'user'."})
 
         user = User.objects.create_user(
@@ -39,7 +39,7 @@ class RegisterSerializer(serializers.ModelSerializer):
             email=validated_data['email']
         )
         # You can add a role field in the user's profile if you want to keep it outside the user model.
-        user.profile.role = role  # Assume you're using a profile model for roles
+        user.profile.role = role  
         user.save()
 
         return user
@@ -75,13 +75,26 @@ class LoginView(APIView):
 
 
 from rest_framework.permissions import BasePermission
-
 class IsAdmin(BasePermission):
     def has_permission(self, request, view):
         if request.user and request.user.is_authenticated:
             # Check if the user is a staff member (admin)
             return request.user.is_staff
         return False
+    
+class IsAdminOrModerator(BasePermission):
+    def has_permission(self, request, view):
+        if request.user and request.user.is_authenticated:
+            # Check if the user has one of the roles: 'admin' or 'moderator'
+            return request.user.profile.role in ['admin', 'customer']
+        return False
+
+class ProtectedViewForAdminOrModerator(APIView):
+    permission_classes = [IsAuthenticated, IsAdminOrModerator]
+
+    def get(self, request):
+        return Response({"message": "This is a protected view, accessible by admins or customer!"})
+
 
 
 class ProtectedView(APIView):
@@ -91,8 +104,7 @@ class ProtectedView(APIView):
         return Response({"message": "This is a protected view, you are authenticated!"})
 
 class ProtectedViewd(APIView):
-    permission_classes = [IsAuthenticated, IsAdmin]  # Applying the custom IsAdmin permission
-
+    permission_classes = [IsAuthenticated, IsAdmin]  
     def get(self, request):
         return Response({"message": "This is a protected view, only accessible by admins!"})
 
