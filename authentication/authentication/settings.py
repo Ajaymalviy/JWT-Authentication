@@ -140,3 +140,10 @@ SAML_AUTH = {
     'IDP_PUBLIC_CERT': '/path/to/idp-public-cert.pem',  # Path to the IdP public certificate
     'SAML_METADATA_URL': 'https://idp.example.com/metadata',  # IdP metadata URL
 }
+
+from datetime import timedelta
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=30),  # Access token expires in 30 minutes
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),     # Refresh token expires in 7 days
+}
