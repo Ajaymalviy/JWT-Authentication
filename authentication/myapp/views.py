@@ -7,17 +7,8 @@ from rest_framework.permissions import IsAuthenticated,BasePermission
 from rest_framework.response import Response
 from rest_framework import status
 from django.contrib.auth import authenticate
+from .models import UserSession
 
-class IsAdmin(BasePermission):
-    """
-    Custom permission to allow only users with 'admin' role.
-    """
-
-    def has_permission(self, request, view):
-        # Check if the user is authenticated and if their role is 'admin'
-        if request.user and request.user.is_authenticated:
-            return request.user.role == 'admin'  # Assuming `role` is directly on User or Profile
-        return False
 
 
 
@@ -58,6 +49,8 @@ class RegisterView(APIView):
             return Response({"message": "User created successfully"}, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+
+import uuid
 class LoginView(APIView):
     def post(self, request):
         serializer = LoginSerializer(data=request.data)
@@ -65,7 +58,20 @@ class LoginView(APIView):
             user = authenticate(username=serializer.validated_data['username'],
                                 password=serializer.validated_data['password'])
             if user is not None:
+                # Create a unique session ID for this login
+                session_id = str(uuid.uuid4())
+                
+                # Store or update the session ID in the database
+                user_session, created = UserSession.objects.update_or_create(
+                    user=user,
+                    defaults={'session_id': session_id}
+                )
+                
+                # Create JWT with session_id
                 refresh = RefreshToken.for_user(user)
+                refresh.payload['session_id'] = session_id  # Add session_id to JWT payload
+                
+                # Return JWT tokens
                 return Response({
                     'access': str(refresh.access_token),
                     'refresh': str(refresh)
@@ -82,21 +88,6 @@ class IsAdmin(BasePermission):
             # Check if the user is a staff member (admin)
             return request.user.is_staff
         return False
-    
-class IsAdminOrModerator(BasePermission):
-    def has_permission(self, request, view):
-        if request.user and request.user.is_authenticated:
-            # Check if the user has one of the roles: 'admin' or 'moderator'
-            return request.user.profile.role in ['admin', 'customer']
-        return False
-
-class ProtectedViewForAdminOrModerator(APIView):
-    permission_classes = [IsAuthenticated, IsAdminOrModerator]
-
-    def get(self, request):
-        return Response({"message": "This is a protected view, accessible by admins or customer!"})
-
-
 
 class ProtectedView(APIView):
     permission_classes = [IsAuthenticated]
@@ -115,9 +106,45 @@ class ProtectedView(APIView):
 
         # Return the HTML content as an HTTP response
         return HttpResponse(html_content, content_type="text/html")
+    
+    
+class IsAdmin(BasePermission):
+    """
+    Custom permission to allow only users with 'admin' role.
+    """
+
+    def has_permission(self, request, view):
+        # Check if the user is authenticated and if their role is 'admin'
+        if request.user and request.user.is_authenticated:
+            return request.user.role == 'admin'  # Assuming `role` is directly on User or Profile
+        return False
+
 
 class ProtectedViewd(APIView):
     permission_classes = [IsAuthenticated, IsAdmin]  
     def get(self, request):
         return Response({"message": "This is a protected view, only accessible by admins!"})
 
+    
+class IsAdminOrModerator(BasePermission):
+    def has_permission(self, request, view):
+        if request.user and request.user.is_authenticated:
+            # Check if the user has one of the roles: 'admin' or 'moderator'
+            return request.user.profile.role in ['admin', 'customer']
+        return False
+
+class ProtectedViewForAdminOrModerator(APIView):
+    permission_classes = [IsAuthenticated, IsAdminOrModerator]
+
+    def get(self, request):
+        return Response({"message": "This is a protected view, accessible by admins or customer!"})
+
+
+class LogoutView(APIView):
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request):
+        # Invalidate the session by deleting it from the database
+        UserSession.objects.filter(user=request.user).delete()
+        
+        return Response({"message": "Logged out successfully."})
