@@ -8,11 +8,44 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.contrib.auth import authenticate
 from .models import UserSession
+from django.conf import settings
+import requests
+
+from django.shortcuts import render
 
 
+# Helper function to verify reCAPTCHA token
+import requests
+from django.conf import settings
+
+import requests
+from django.conf import settings
+
+# Helper function to verify reCAPTCHA token
+def verify_recaptcha(token):
+    secret_key = settings.RECAPTCHA_SECRET_KEY  # Ensure this is set in your settings.py
+    url = 'https://www.google.com/recaptcha/api/siteverify'
+    payload = {
+        'secret': secret_key,
+        'response': token
+    }
+    response = requests.post(url, data=payload)
+    result = response.json()
+    
+    # Only return the 'success' field
+    return result.get('success', False)
 
 
-# Serializer for Register with role field
+from django.shortcuts import render
+
+def login_view(request):
+    # Pass the reCAPTCHA site key from settings to the template
+    print('recaptcha' ,settings.RECAPTCHA_SITE_KEY)
+    return render(request, 'login.html', {
+        'recaptcha_site_key': settings.RECAPTCHA_SITE_KEY
+    })
+
+
 class RegisterSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
@@ -40,6 +73,7 @@ class RegisterSerializer(serializers.ModelSerializer):
 class LoginSerializer(serializers.Serializer):
     username = serializers.CharField()
     password = serializers.CharField()
+    recaptcha_token = serializers.CharField()  
 
 class RegisterView(APIView):
     def post(self, request):
@@ -50,33 +84,46 @@ class RegisterView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+
 import uuid
 class LoginView(APIView):
     def post(self, request):
+        # Deserialize the data (username, password, and recaptcha_token)
         serializer = LoginSerializer(data=request.data)
         if serializer.is_valid():
+            recaptcha_token = serializer.validated_data['recaptcha_token']
+            
+            # Step 1: Verify reCAPTCHA token
+            success = verify_recaptcha(recaptcha_token)
+            if not success:
+                # Reject login if reCAPTCHA validation fails
+                return Response({"error": "Invalid reCAPTCHA. Please try again."}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Step 2: Authenticate user with username and password
             user = authenticate(username=serializer.validated_data['username'],
                                 password=serializer.validated_data['password'])
             if user is not None:
-                # Create a unique session ID for this login
+                # Step 3: Create a unique session ID for this login
                 session_id = str(uuid.uuid4())
-                
-                # Store or update the session ID in the database
+
+                # Step 4: Store or update the session ID in the database
                 user_session, created = UserSession.objects.update_or_create(
                     user=user,
                     defaults={'session_id': session_id}
                 )
-                
-                # Create JWT with session_id
+
+                # Step 5: Create JWT with session_id
                 refresh = RefreshToken.for_user(user)
                 refresh.payload['session_id'] = session_id  # Add session_id to JWT payload
-                
-                # Return JWT tokens
+
+                # Return the JWT tokens
                 return Response({
                     'access': str(refresh.access_token),
                     'refresh': str(refresh)
                 })
             return Response({"error": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
+
+        # If serializer is not valid, return errors
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
