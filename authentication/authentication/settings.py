@@ -152,3 +152,7 @@ SIMPLE_JWT = {
     'ROTATE_REFRESH_TOKENS': False,  # We don't want to rotate the refresh token
     'BLACKLIST_AFTER_ROTATION': False,  # Optional: If you want to blacklist old refresh tokens after they are rotated
 }
+
+# settings.py
+RECAPTCHA_SECRET_KEY = '6LeEQ54qAAAAAOjPl7EX9P6VALK_d4jM-EQktUUT'  # The secret key you got from Google
+RECAPTCHA_SITE_KEY = '6LeEQ54qAAAAAO-gtav61mQJTYLAQR_Xtq3bXGoU'
