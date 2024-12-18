@@ -10,16 +10,8 @@ from django.contrib.auth import authenticate
 from .models import UserSession
 from django.conf import settings
 import requests
-
 from django.shortcuts import render
 
-
-# Helper function to verify reCAPTCHA token
-import requests
-from django.conf import settings
-
-import requests
-from django.conf import settings
 
 # Helper function to verify reCAPTCHA token
 
@@ -63,7 +55,7 @@ class RegisterSerializer(serializers.ModelSerializer):
 class LoginSerializer(serializers.Serializer):
     username = serializers.CharField()
     password = serializers.CharField()
-    recaptcha_token = serializers.CharField()  
+    # recaptcha_token = serializers.CharField()  
 
 class RegisterView(APIView):
     def post(self, request):
@@ -99,45 +91,114 @@ def verify_recaptcha(token):
 
 
 
+# import uuid
+# class LoginView(APIView):
+#     def post(self, request):
+#         # Deserialize the data (username, password, and recaptcha_token)
+#         serializer = LoginSerializer(data=request.data)
+#         if serializer.is_valid():
+#             # print("inside valid serializer function")
+#             # recaptcha_token = serializer.validated_data['recaptcha_token']
+#             # print('recaptcha_token', recaptcha_token)
+#             # # Step 1: Verify reCAPTCHA token
+#             # success = verify_recaptcha(recaptcha_token)
+#             # print('successs checking ', success)
+#             # if not success:
+#             #     # Reject login if reCAPTCHA validation fails
+#             #     return Response({"error": "Invalid reCAPTCHA. Please try again."}, status=status.HTTP_400_BAD_REQUEST)
+
+#             # Step 2: Authenticate user with username and password
+#             user = authenticate(username=serializer.validated_data['username'],
+#                                 password=serializer.validated_data['password'])
+#             if user is not None:
+#                 # Step 3: Create a unique session ID for this login
+#                 session_id = str(uuid.uuid4())
+
+#                 # Step 4: Store or update the session ID in the database
+#                 user_session, created = UserSession.objects.update_or_create(
+#                     user=user,
+#                     defaults={'session_id': session_id}
+#                 )
+
+#                 # Step 5: Create JWT with session_id
+#                 refresh = RefreshToken.for_user(user)
+#                 refresh.payload['session_id'] = session_id  # Add session_id to JWT payload
+
+#                 # Return the JWT tokens
+#                 return Response({
+#                     'access': str(refresh.access_token),
+#                     'refresh': str(refresh)
+#                 })
+#             return Response({"error": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
+
+#         # If serializer is not valid, return errors
+#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+
 import uuid
+from django.contrib.auth import authenticate
+from django.utils import timezone
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from .models import UserProfile  # Import UserProfile model
+
 class LoginView(APIView):
     def post(self, request):
-        # Deserialize the data (username, password, and recaptcha_token)
+        # Deserialize the data (username, password)
         serializer = LoginSerializer(data=request.data)
         if serializer.is_valid():
-            print("inside valid serializer function")
-            recaptcha_token = serializer.validated_data['recaptcha_token']
-            print('recaptcha_token', recaptcha_token)
-            # Step 1: Verify reCAPTCHA token
-            success = verify_recaptcha(recaptcha_token)
-            print('successs checking ', success)
-            if not success:
-                # Reject login if reCAPTCHA validation fails
-                return Response({"error": "Invalid reCAPTCHA. Please try again."}, status=status.HTTP_400_BAD_REQUEST)
+            username = serializer.validated_data['username']
+            password = serializer.validated_data['password']
 
-            # Step 2: Authenticate user with username and password
-            user = authenticate(username=serializer.validated_data['username'],
-                                password=serializer.validated_data['password'])
-            if user is not None:
-                # Step 3: Create a unique session ID for this login
-                session_id = str(uuid.uuid4())
+            # Get the user object
+            try:
+                user = User.objects.get(username=username)
+            except User.DoesNotExist:
+                return Response({"error": "Invalid credentials."}, status=status.HTTP_400_BAD_REQUEST)
 
-                # Step 4: Store or update the session ID in the database
-                user_session, created = UserSession.objects.update_or_create(
-                    user=user,
-                    defaults={'session_id': session_id}
-                )
+            # Get the user profile (related to the user model)
+            user_profile, created = UserProfile.objects.get_or_create(user=user)
 
-                # Step 5: Create JWT with session_id
-                refresh = RefreshToken.for_user(user)
-                refresh.payload['session_id'] = session_id  # Add session_id to JWT payload
+            # Check if the user is locked
+            if user_profile.is_locked():
+                return Response({"error": "Account locked. Please try again later."}, status=status.HTTP_403_FORBIDDEN)
 
-                # Return the JWT tokens
-                return Response({
-                    'access': str(refresh.access_token),
-                    'refresh': str(refresh)
-                })
-            return Response({"error": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
+            # Authenticate user with username and password
+            user = authenticate(username=username, password=password)
+
+            if user is None:
+                # Increment failed login attempts and lock user if necessary
+                user_profile.failed_login_attempts += 1
+                if user_profile.failed_login_attempts >= 3:
+                    user_profile.lockout_time = timezone.now()  # Lock user for 15 minutes
+                user_profile.save()
+                return Response({"error": "Invalid credentials."}, status=status.HTTP_401_UNAUTHORIZED)
+
+            # Reset failed login attempts on successful login
+            user_profile.failed_login_attempts = 0
+            user_profile.lockout_time = None
+            user_profile.save()
+
+            # Create a unique session ID for this login
+            session_id = str(uuid.uuid4())
+
+            # Step 4: Store or update the session ID in the database (you might have a session model for this)
+            user_session, created = UserSession.objects.update_or_create(
+                user=user,
+                defaults={'session_id': session_id}
+            )
+
+            # Step 5: Create JWT with session_id
+            refresh = RefreshToken.for_user(user)
+            refresh.payload['session_id'] = session_id  # Add session_id to JWT payload
+
+            # Return the JWT tokens
+            return Response({
+                'access': str(refresh.access_token),
+                'refresh': str(refresh)
+            })
 
         # If serializer is not valid, return errors
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
