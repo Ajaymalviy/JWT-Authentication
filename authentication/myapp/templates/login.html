@@ -42,19 +42,15 @@
 // Automatically get reCAPTCHA token when form is submitted
 function handleFormSubmit(event) {
     event.preventDefault();  // Prevent the form from submitting
-    grecaptcha.execute('6LeEQ54qAAAAAO-gtav61mQJTYLAQR_Xtq3bXGoU', { action: 'login' }).then(function(token) {
-        onSubmit(token); // Pass the token to the onSubmit function
+    grecaptcha.execute('{{ recaptcha_site_key }}', { action: 'login' })
+    .then(function(token) {
+        console.log('reCAPTCHA Token:', token);  
+        console.log('reCAPTCHA Token:', token);
+        console.log('reCAPTCHA Token:', token);// Log the token
+        onSubmit(token);
     });
+
 }
-
-
-        // Automatically get reCAPTCHA token when form is submitted
-        function handleFormSubmit(event) {
-            event.preventDefault();  // Prevent form submission
-            grecaptcha.execute('{{ recaptcha_site_key }}', { action: 'login' }).then(function(token) {
-                onSubmit(token);  // Call the function to submit the form with reCAPTCHA token
-            });
-        }
     </script>
 </head>
 <body>
