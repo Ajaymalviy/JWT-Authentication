@@ -147,7 +147,7 @@ SAML_AUTH = {
 from datetime import timedelta
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=3),  # Access token expires in 3 minutes
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=13),  # Access token expires in 3 minutes
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),     # Refresh token expires in 7 days
     'ROTATE_REFRESH_TOKENS': False,  # We don't want to rotate the refresh token
     'BLACKLIST_AFTER_ROTATION': False,  # Optional: If you want to blacklist old refresh tokens after they are rotated
