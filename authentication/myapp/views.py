@@ -22,23 +22,13 @@ import requests
 from django.conf import settings
 
 # Helper function to verify reCAPTCHA token
-def verify_recaptcha(token):
-    secret_key = settings.RECAPTCHA_SECRET_KEY  # Ensure this is set in your settings.py
-    url = 'https://www.google.com/recaptcha/api/siteverify'
-    payload = {
-        'secret': secret_key,
-        'response': token
-    }
-    response = requests.post(url, data=payload)
-    result = response.json()
-    
-    # Only return the 'success' field
-    return result.get('success', False)
+
 
 
 from django.shortcuts import render
 
 def login_view(request):
+    print('i am at login view')
     # Pass the reCAPTCHA site key from settings to the template
     print('recaptcha' ,settings.RECAPTCHA_SITE_KEY)
     return render(request, 'login.html', {
@@ -85,16 +75,42 @@ class RegisterView(APIView):
 
 
 
+
+def verify_recaptcha(token):
+    print('i am at verify recaptcha')
+    secret_key = settings.RECAPTCHA_SECRET_KEY  # Ensure this is set in your settings.py
+    print('secrete key is ', secret_key)
+    url = 'https://www.google.com/recaptcha/api/siteverify'
+
+    payload = {
+        'secret': secret_key,
+        'response': token
+    }
+
+    print(f"Sending payload: {payload}")  # Log the payload
+    response = requests.post(url, data=payload)
+    print(f"Response: {response.text}")  # Log the full response from Google
+
+
+    result = response.json()
+    print('result is ', result)
+    # Only return the 'success' field
+    return result.get('success', False)
+
+
+
 import uuid
 class LoginView(APIView):
     def post(self, request):
         # Deserialize the data (username, password, and recaptcha_token)
         serializer = LoginSerializer(data=request.data)
         if serializer.is_valid():
+            print("inside valid serializer function")
             recaptcha_token = serializer.validated_data['recaptcha_token']
-            
+            print('recaptcha_token', recaptcha_token)
             # Step 1: Verify reCAPTCHA token
             success = verify_recaptcha(recaptcha_token)
+            print('successs checking ', success)
             if not success:
                 # Reject login if reCAPTCHA validation fails
                 return Response({"error": "Invalid reCAPTCHA. Please try again."}, status=status.HTTP_400_BAD_REQUEST)
