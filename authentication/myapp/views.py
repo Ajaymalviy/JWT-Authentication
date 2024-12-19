@@ -136,13 +136,86 @@ def verify_recaptcha(token):
 
 
 
-import uuid
+# import uuid
+# from django.contrib.auth import authenticate
+# from django.utils import timezone
+# from rest_framework.views import APIView
+# from rest_framework.response import Response
+# from rest_framework import status
+# from .models import UserProfile  # Import UserProfile model
+
+# class LoginView(APIView):
+#     def post(self, request):
+#         # Deserialize the data (username, password)
+#         serializer = LoginSerializer(data=request.data)
+#         if serializer.is_valid():
+#             username = serializer.validated_data['username']
+#             password = serializer.validated_data['password']
+
+#             # Get the user object
+#             try:
+#                 user = User.objects.get(username=username)
+#             except User.DoesNotExist:
+#                 return Response({"error": "Invalid credentials."}, status=status.HTTP_400_BAD_REQUEST)
+
+#             # Get the user profile (related to the user model)
+#             user_profile, created = UserProfile.objects.get_or_create(user=user)
+
+#             # Check if the user is locked
+#             if user_profile.is_locked():
+#                 return Response({"error": "Account locked. Please try again later."}, status=status.HTTP_403_FORBIDDEN)
+
+#             # Authenticate user with username and password
+#             user = authenticate(username=username, password=password)
+
+#             if user is None:
+#                 # Increment failed login attempts and lock user if necessary
+#                 user_profile.failed_login_attempts += 1
+#                 if user_profile.failed_login_attempts >= 3:
+#                     user_profile.lockout_time = timezone.now()  # Lock user for 15 minutes
+#                 user_profile.save()
+#                 return Response({"error": "Invalid credentials."}, status=status.HTTP_401_UNAUTHORIZED)
+
+#             # Reset failed login attempts on successful login
+#             user_profile.failed_login_attempts = 0
+#             user_profile.lockout_time = None
+#             user_profile.save()
+
+#             # Create a unique session ID for this login
+#             session_id = str(uuid.uuid4())
+
+#             # Step 4: Store or update the session ID in the database (you might have a session model for this)
+#             user_session, created = UserSession.objects.update_or_create(
+#                 user=user,
+#                 defaults={'session_id': session_id}
+#             )
+
+#             # Step 5: Create JWT with session_id
+#             refresh = RefreshToken.for_user(user)
+#             refresh.payload['session_id'] = session_id  # Add session_id to JWT payload
+
+#             # Return the JWT tokens
+#             return Response({
+#                 'access': str(refresh.access_token),
+#                 'refresh': str(refresh)
+#             })
+
+#         # If serializer is not valid, return errors
+#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+from django.core.cache import cache
 from django.contrib.auth import authenticate
-from django.utils import timezone
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from .models import UserProfile  # Import UserProfile model
+from django.contrib.auth.models import User
+import uuid
+from datetime import timedelta
+
+# Constants
+MAX_ATTEMPTS = 3
+BLOCK_TIME = 15 * 60  # Lock time in seconds (15 minutes)
 
 class LoginView(APIView):
     def post(self, request):
@@ -152,39 +225,42 @@ class LoginView(APIView):
             username = serializer.validated_data['username']
             password = serializer.validated_data['password']
 
-            # Get the user object
+          
+            ip_address = self.get_client_ip(request)
+            # print(id_address)
+            attempts_key = f"login_attempts_{ip_address}"
+            block_key = f"blocked_{ip_address}"
+
+            if cache.get(block_key):
+                return Response({"error": "Too many login attempts. Please try again later."}, status=status.HTTP_403_FORBIDDEN)
+
             try:
                 user = User.objects.get(username=username)
             except User.DoesNotExist:
                 return Response({"error": "Invalid credentials."}, status=status.HTTP_400_BAD_REQUEST)
 
-            # Get the user profile (related to the user model)
-            user_profile, created = UserProfile.objects.get_or_create(user=user)
-
-            # Check if the user is locked
-            if user_profile.is_locked():
-                return Response({"error": "Account locked. Please try again later."}, status=status.HTTP_403_FORBIDDEN)
-
-            # Authenticate user with username and password
+            # Authenticate the user
             user = authenticate(username=username, password=password)
 
             if user is None:
-                # Increment failed login attempts and lock user if necessary
-                user_profile.failed_login_attempts += 1
-                if user_profile.failed_login_attempts >= 3:
-                    user_profile.lockout_time = timezone.now()  # Lock user for 15 minutes
-                user_profile.save()
+                # Increment failed login attempts and block IP if necessary
+                failed_attempts = cache.get(attempts_key, 0)
+                failed_attempts += 1
+                print('failed attempts is ', failed_attempts)
+
+                if failed_attempts >= MAX_ATTEMPTS:
+                    cache.set(block_key, True, BLOCK_TIME)
+
+                # Store the updated failed attempts count in cache
+                cache.set(attempts_key, failed_attempts, BLOCK_TIME)
+
                 return Response({"error": "Invalid credentials."}, status=status.HTTP_401_UNAUTHORIZED)
 
-            # Reset failed login attempts on successful login
-            user_profile.failed_login_attempts = 0
-            user_profile.lockout_time = None
-            user_profile.save()
+            cache.delete(attempts_key)
 
-            # Create a unique session ID for this login
             session_id = str(uuid.uuid4())
 
-            # Step 4: Store or update the session ID in the database (you might have a session model for this)
+            # Step 4: You can store or update the session ID in the database if you have a session model
             user_session, created = UserSession.objects.update_or_create(
                 user=user,
                 defaults={'session_id': session_id}
@@ -202,6 +278,19 @@ class LoginView(APIView):
 
         # If serializer is not valid, return errors
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def get_client_ip(self, request):
+        """Returns the client's IP address."""
+        print('ip address is ')
+        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+        print('something forwarded like ',x_forwarded_for)
+        if x_forwarded_for:
+            ip = x_forwarded_for.split(',')[0]
+            print(ip)
+        else:
+            ip = request.META.get('REMOTE_ADDR')
+            print(ip)
+        return ip
 
 
 
