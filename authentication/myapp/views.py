@@ -227,20 +227,26 @@ class LoginView(APIView):
 
           
             ip_address = self.get_client_ip(request)
-            # print(id_address)
+            print('ip address is ',ip_address)
             attempts_key = f"login_attempts_{ip_address}"
+            print('attempts_key is ', attempts_key)
+
             block_key = f"blocked_{ip_address}"
+            print('block_key is ', block_key)
+
 
             if cache.get(block_key):
                 return Response({"error": "Too many login attempts. Please try again later."}, status=status.HTTP_403_FORBIDDEN)
 
             try:
                 user = User.objects.get(username=username)
+                print('user is someone ', user)
             except User.DoesNotExist:
                 return Response({"error": "Invalid credentials."}, status=status.HTTP_400_BAD_REQUEST)
 
             # Authenticate the user
             user = authenticate(username=username, password=password)
+            
 
             if user is None:
                 # Increment failed login attempts and block IP if necessary
@@ -286,10 +292,10 @@ class LoginView(APIView):
         print('something forwarded like ',x_forwarded_for)
         if x_forwarded_for:
             ip = x_forwarded_for.split(',')[0]
-            print(ip)
+            print('done' ,ip)
         else:
             ip = request.META.get('REMOTE_ADDR')
-            print(ip)
+            print('done', ip)
         return ip
 
 
