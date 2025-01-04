@@ -6,6 +6,7 @@ from .views import RegisterView, LoginView,   ProtectedView, ProtectedViewd, Pro
 from rest_framework_simplejwt import views as jwt_views
 from myapp import views
 
+
 urlpatterns = [
     path('register/', RegisterView.as_view(), name='register'),
     path('api/login/', LoginView.as_view(), name='login'),
