@@ -130,8 +130,7 @@ def verify_recaptcha(token):
 #                     'refresh': str(refresh)
 #                 })
 #             return Response({"error": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
-
-#         # If serializer is not valid, return errors
+         # If serializer is not valid, return errors
 #         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
