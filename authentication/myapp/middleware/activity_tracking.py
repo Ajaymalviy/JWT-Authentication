@@ -1,3 +1,4 @@
+'this application is just activity traking in jwt '
 from datetime import timedelta
 from django.http import JsonResponse
 from django.utils.timezone import now
