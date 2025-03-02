@@ -9,6 +9,7 @@ class UserProfile(models.Model):
     failed_login_attempts = models.PositiveIntegerField(default=0)
     lockout_time = models.DateTimeField(null=True, blank=True)
 
+    #create a function for lock the user by time
     def is_locked(self):
         if self.lockout_time:
             if timezone.now() > self.lockout_time + timedelta(minutes=15):
