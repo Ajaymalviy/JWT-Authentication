@@ -7,7 +7,7 @@ from rest_framework.permissions import IsAuthenticated,BasePermission
 from rest_framework.response import Response
 from rest_framework import status
 from django.contrib.auth import authenticate
-from .models import UserSession
+from .models import UserSession,UserProfile
 from django.conf import settings
 import requests
 from django.shortcuts import render
@@ -28,26 +28,33 @@ def login_view(request):
     })
 
 
-class RegisterSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = User
-        fields = ['username', 'password', 'email', 'role']  # Include role field
-        extra_kwargs = {'password': {'write_only': True}}
+class RegisterSerializer(serializers.Serializer):
+    # class Meta:
+    #     model = User
+    #     fields = ['username', 'password', 'email', 'role']  # Include role field
+    #     extra_kwargs = {'password': {'write_only': True}}
+
+
+    username = serializers.CharField()
+    email = serializers.EmailField()
+    password = serializers.CharField(write_only=True)
+    role = serializers.ChoiceField(choices=['admin', 'user', 'customer'])
 
     def create(self, validated_data):
         # Check if the role is valid before creating the user
         role = validated_data.get('role', 'user')  # Default role is 'user'
-        if role not in ['admin', 'user','customer']:
+        if role not in ['admin', 'user']:
             raise serializers.ValidationError({"role": "Invalid role. Choose either 'admin' or 'user'."})
 
         user = User.objects.create_user(
             username=validated_data['username'],
             password=validated_data['password'],
-            email=validated_data['email']
+            email=validated_data['email'],
         )
         # You can add a role field in the user's profile if you want to keep it outside the user model.
-        user.profile.role = role  
-        user.save()
+        UserProfile.objects.create(user=user, role=role)
+ 
+        # user.save()
 
         return user
 
